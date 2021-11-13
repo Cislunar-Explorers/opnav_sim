@@ -1,7 +1,9 @@
 import json
 import math
 import os.path
-from numpy import linspace, radians, zeros
+from numpy import linspace, newaxis, pi, radians, tan, zeros
+from numpy.linalg import norm
+import numpy as np
 from pyquaternion import Quaternion
 import cv2
 from libopnav import *
@@ -30,7 +32,7 @@ def main():
 
     # Absolute time corresponding to t0 (from OreKit simulation that produced traj2.csv)
     epoch = '2020-06-27T21:08:03.0212 TDB'
-    with open('trajectory_sim_easy/cameras.json', 'w') as f:
+    with open('cameras.json', 'w') as f:
         json.dump({'epoch': epoch, 'cameras': [c.as_dict() for c in cameras.values()]}, f, indent=4)
 
     # Spacecraft spin vector in body frame [rad/s]
@@ -50,14 +52,14 @@ def main():
     # exhausted.  Note: this will leave a trailing comma, which is not allowed by JSON.
     # Note: This is also not inside the object enclosing 'cameras' when it should be.
     observations = []
-    with open('trajectory.csv') as f:
+    with open('traj-case1c.csv') as f:
         for line in f:
             if line[0] == 't': continue  # Skip header
             t0, bodies, spacecraft, obs = parse_line(line, q_world2spin, omega_body)
             frames = render_acquisition(t0, cameras, spacecraft, obs, colors_bgr)
             observations.append({'time': t0, 'bodies': [b.as_dict() for b in bodies], 'spacecraft': spacecraft.as_dict(),
                            'observed_bodies': [b.as_dict() for b in obs], 'frames': frames})
-    with open('trajectory_sim_easy/observations.json', 'w') as f:
+    with open('observations.json', 'w') as f:
         json.dump({"observations": observations}, f, indent = 4)
 
 
@@ -280,13 +282,13 @@ def render_acquisition(t0, cameras, spacecraft, obs_bodies, colors_bgr):
                         exposure = "Low"
 
                 filename_gn = 'cam%s_exp%s_f%d_dt%.5f_gn.png' % (name, exposure, f, delta_t)
-                cv2.imwrite(os.path.join('trajectory_sim_easy/images', filename_gn), img)
+                cv2.imwrite(os.path.join('images', filename_gn), img)
 
                 # Render ideal stereographic frame
                 img = render_stereographic(camera, obs_f, colors_bgr, illuminator)
                 draw_stereographic_detections(detections, img)
                 filename_st = 'cam%s_exp%s_f%d_dt%.5f_st.png' % (name, exposure, f, delta_t)
-                cv2.imwrite(os.path.join('trajectory_sim_easy/images', filename_st), img)
+                cv2.imwrite(os.path.join('images', filename_st), img)
 
                 frame_dict = {'time': tf,
                               'camera': camera.name,
@@ -404,11 +406,11 @@ def test_main():
         detections = [Detection(ot, camera) for ot in obs]
         img_gn = render_bodies(camera, spacecraft, obs, colors_bgr, illuminator)
         filename_gn = 'gn_%s.png' % camera.name
-        cv2.imwrite(os.path.join('old_runs/out', filename_gn), img_gn)
+        cv2.imwrite(os.path.join('out', filename_gn), img_gn)
         img_st = render_stereographic(camera, obs, colors_bgr, illuminator)
         draw_stereographic_detections(detections, img_st)
         filename_st = 'st_%s.png' % camera.name
-        cv2.imwrite(os.path.join('old_runs/out', filename_st), img_st)
+        cv2.imwrite(os.path.join('out', filename_st), img_st)
 
         tf = ord(camera.name) - ord('A')
         q_world2cam = spacecraft.q_world2body*camera.q_body2cam
